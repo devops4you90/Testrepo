@@ -1,0 +1,126 @@
+trigger:
+- main
+
+variables:
+  buildConfiguration: 'Release'
+
+parameters:
+- name: environment
+  type: string
+  default: 'Dev'
+  values:
+  - 'Dev'
+  - 'Test'
+  - 'Prod'
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: Build
+    displayName: 'Build Job'
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '6.x' # Specify your .NET version
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore Packages'
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build Solution'
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish Solution'
+      inputs:
+        command: 'publish'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: drop
+
+- stage: Deploy_Dev
+  displayName: 'Deploy to Dev'
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.environment }}', 'Dev')) # Trigger based on environment parameter
+  jobs:
+  - deployment: Deploy
+    displayName: 'Deploy to Dev Environment'
+    environment: 'Dev'
+    pool:
+      vmImage: 'windows-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureFunctionApp@2
+            displayName: 'Deploy Function App to Dev'
+            inputs:
+              azureSubscription: 'AzureServiceConnection' # Replace with your service connection
+              appType: 'functionApp'
+              appName: 'YourFunctionAppName-Dev' # Replace with your Function App name
+              package: '$(Pipeline.Workspace)/drop/**/*.zip'
+
+- stage: Deploy_Test
+  displayName: 'Deploy to Test'
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.environment }}', 'Test')) # Trigger based on environment parameter
+  jobs:
+  - deployment: Deploy
+    displayName: 'Deploy to Test Environment'
+    environment: 'Test'
+    pool:
+      vmImage: 'windows-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureFunctionApp@2
+            displayName: 'Deploy Function App to Test'
+            inputs:
+              azureSubscription: 'AzureServiceConnection' # Replace with your service connection
+              appType: 'functionApp'
+              appName: 'YourFunctionAppName-Test' # Replace with your Function App name
+              package: '$(Pipeline.Workspace)/drop/**/*.zip'
+
+- stage: Deploy_Prod
+  displayName: 'Deploy to Prod'
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.environment }}', 'Prod')) # Trigger based on environment parameter
+  jobs:
+  - deployment: Deploy
+    displayName: 'Deploy to Prod Environment'
+    environment: 'Prod'
+    pool:
+      vmImage: 'windows-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+
+          - task: AzureFunctionApp@2
+            displayName: 'Deploy Function App to Prod'
+            inputs:
+              azureSubscription: 'AzureServiceConnection' # Replace with your service connection
+              appType: 'functionApp'
+              appName: 'YourFunctionAppName-Prod' # Replace with your Function App name
+              package: '$(Pipeline.Workspace)/drop/**/*.zip'
