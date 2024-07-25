@@ -1,0 +1,78 @@
+# azure-pipelines.yml
+trigger:
+- main
+
+pr:
+- main
+
+variables:
+  - name: ProjectName
+    value: "YourProjectName"
+
+stages:
+- template: deploy-stage-template.yml
+  parameters:
+    environment: 'Dev'
+    projectName: ${{ variables.ProjectName }}
+    appName: 'ZWETITNFAPD003'
+    displayName: 'Deploy_Dev'
+
+- template: deploy-stage-template.yml
+  parameters:
+    environment: 'QA'
+    projectName: ${{ variables.ProjectName }}
+    appName: 'ZWETITNFAPQ001'
+    displayName: 'Deploy_QA'
+
+- template: deploy-stage-template.yml
+  parameters:
+    environment: 'Stage'
+    projectName: ${{ variables.ProjectName }}
+    appName: 'ZWETITNFAPS001'
+    displayName: 'Deploy_Stage'
+    preDeployApprovals: true
+
+
+# deploy-stage-template.yml
+parameters:
+  environment: ''
+  projectName: ''
+  appName: ''
+  displayName: ''
+  preDeployApprovals: false
+
+stages:
+- stage: ${{ parameters.environment }}
+  displayName: ${{ parameters.displayName }}
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.environment }}', '${{ parameters.environment }}'))
+  variables:
+    - group: Deploy-Environment-${{ parameters.environment }}
+  jobs:
+  - job: Deploy_${{ parameters.environment }}
+    displayName: Deploy functionapp
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifactName: '${{ parameters.projectName }}'
+              buildType: 'current'
+              targetPath: '$(Build.ArtifactStagingDirectory)/${{ parameters.projectName }}'
+          - task: AzureFunctionApp@2
+            displayName: 'Azure Function App Deploy: ${{ parameters.appName }}'
+            inputs:
+              connectedServiceNameARM: 'VZI-GX-NP-SUB049 (738ddeb5-7602-4bfb-a123-ac967fb32b6a)'
+              appType: functionApp
+              appName: ${{ parameters.appName }}
+              package: '$(System.DefaultWorkingDirectory)/_Functions App-CI/drop/*.zip'
+              appSettings: '-WEBSITE_RUN_FROM_PACKAGE 1 -FUNCTIONS_WORKER_RUNTIME dotnet-isolated'
+              deploymentMethod: zipDeploy
+  ${{ if eq(parameters.preDeployApprovals, true) }}:
+  - preDeployApprovals:
+     approvals:
+       - type: "Manual"
+         name: "Pre-deployment approval"
+         reviewers:
+           - group: "Project Administrators" # or any appropriate group
