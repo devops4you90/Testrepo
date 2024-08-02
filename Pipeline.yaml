@@ -1,0 +1,6 @@
+trigger: none
+
+stages:
+- template: templates/dotnet-build.yml
+  parameters: 
+    Environment: 'Dev'  # Override only this parameter, others will use default values
