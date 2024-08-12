@@ -1,0 +1,42 @@
+trigger:
+- main
+
+variables:
+  environment: ''  # Set this in the UI or via parameters
+  appName: ''
+  artifactName: ''
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    steps:
+    
+    # Set appName and artifactName based on environment
+    - ${{ if eq(variables['environment'], 'dev') }}:
+        variables:
+          appName: 'myapp-dev'
+          artifactName: 'myapp-dev-artifact.jar'
+          
+    - ${{ if eq(variables['environment'], 'prod') }}:
+        variables:
+          appName: 'myapp-prod'
+          artifactName: 'myapp-prod-artifact.jar'
+
+    - ${{ if eq(variables['environment'], 'staging') }}:
+        variables:
+          appName: 'myapp-staging'
+          artifactName: 'myapp-staging-artifact.jar'
+
+    # Example step to use the appName and artifactName variables
+    - script: |
+        echo "App Name: $(appName)"
+        echo "Artifact Name: $(artifactName)"
+      displayName: 'Display App and Artifact Names'
+
+    # Here, you would use the appName and artifactName variables in your build process
+    # For example:
+    - script: |
+        echo "Building $(appName) and creating $(artifactName)"
+        # Insert actual build commands here
+      displayName: 'Build Application'
