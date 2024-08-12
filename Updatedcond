@@ -1,0 +1,53 @@
+trigger: none
+
+variables:
+  - group: Titan_OneMiddleware_Functionapp
+
+  # Define dynamic variables using conditionals
+  - name: appName
+    ${{ if eq(parameters.Environment, 'Dev') }}: 
+      value: 'myapp-dev'
+    ${{ if eq(parameters.Environment, 'QA') }}: 
+      value: 'myapp-qa'
+    ${{ if eq(parameters.Environment, 'Prod') }}: 
+      value: 'myapp-prod'
+  
+  - name: artifactName
+    ${{ if eq(parameters.Environment, 'Dev') }}: 
+      value: 'myapp-dev-artifact.jar'
+    ${{ if eq(parameters.Environment, 'QA') }}: 
+      value: 'myapp-qa-artifact.jar'
+    ${{ if eq(parameters.Environment, 'Prod') }}: 
+      value: 'myapp-prod-artifact.jar'
+
+parameters:
+ - name: Projectname
+   displayName: Enter your Projectname
+   type: string
+ - name: Environment
+   displayName: Select Environment
+   type: string
+   values:
+   - Dev
+   - QA
+   - Prod
+ - name: serviceConnection 
+   displayName: Service Connection
+   type: string
+   values: 
+   - VZI-GX-NP-SUB049 (738ddeb5-7602-4bfb-a123-ac967fb32b6a)
+
+stages:
+- template: templates/dotnet-build.yml
+  parameters: 
+    Environment: ${{ parameters.Environment }}
+    ProjectName: ${{ parameters.Projectname }}
+    artifactName: ${{ variables.artifactName }}
+
+- template: templates/dotnet-release.yml
+  parameters: 
+    Environment: ${{ parameters.Environment }}   
+    ProjectName: ${{ parameters.Projectname }}
+    appName: ${{ variables.appName }}
+    artifactName: ${{ variables.artifactName }}
+    serviceConnection: ${{ parameters.serviceConnection }}
